@@ -102,3 +102,7 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+dec_output/*
+enc_output/*
+temp/*
