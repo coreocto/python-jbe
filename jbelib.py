@@ -80,7 +80,7 @@ def encode(source, target):
 
         with open(target, "wb") as file_out:
             log(str(file_size))
-            file_out.write(struct.pack(">I", file_size))
+            file_out.write(struct.pack(">Q", file_size))
 
             with open(tmp_data1, "rb") as data1_file:
                 shutil.copyfileobj(data1_file, file_out)
@@ -113,7 +113,7 @@ def decode(source, target):
             with open(tmp_data1, "wb+") as data1_file:
                 with open(tmp_data2, "wb+") as data2_file:
                     # first four bytes are the file size
-                    file_size_bytes = struct.unpack(">I", file_in.read(4))
+                    file_size_bytes = struct.unpack(">Q", file_in.read(8))
                     file_size_bytes = file_size_bytes[0]
 
                     # determine the size of data 2
@@ -123,7 +123,7 @@ def decode(source, target):
 
                     data2_start = file_size - data2_size
 
-                    for i in range(4, data2_start):
+                    for i in range(8, data2_start):
                         data1_file.write(file_in.read(1))
                     data1_file.flush()
 
