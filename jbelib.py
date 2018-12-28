@@ -84,11 +84,11 @@ def encode(source, target):
 
             with open(tmp_data1, "rb") as data1_file:
                 shutil.copyfileobj(data1_file, file_out)
-            os.remove(tmp_data1)
+            # os.remove(tmp_data1)
 
             with open(tmp_data2, "rb") as data2_file:
                 shutil.copyfileobj(data2_file, file_out)
-            os.remove(tmp_data2)
+            # os.remove(tmp_data2)
 
             file_out.flush()
     except PermissionError as identifier:
@@ -103,90 +103,88 @@ def decode(source, target):
 
     # tmp_data1 = r'r:\data3.bin'
     # tmp_data2 = r'r:\data4.bin'
-    tmp_data1 = os.path.basename(source).replace(':', '_').replace(' ', '_').replace('.', '_')+'_data3.bin'
+    # tmp_data1 = os.path.basename(source).replace(':', '_').replace(' ', '_').replace('.', '_')+'_data3.bin'
     tmp_data2 = os.path.basename(source).replace(':', '_').replace(' ', '_').replace('.', '_')+'_data4.bin'
-    tmp_data1 = os.path.join("temp", tmp_data1)
+    # tmp_data1 = os.path.join("temp", tmp_data1)
     tmp_data2 = os.path.join("temp", tmp_data2)
 
     with open(source, "rb") as file_in:
         with open(target, "wb") as file_out:
-            with open(tmp_data1, "wb+") as data1_file:
-                with open(tmp_data2, "wb+") as data2_file:
-                    # first four bytes are the file size
-                    file_size_bytes = struct.unpack(">Q", file_in.read(8))
-                    file_size_bytes = file_size_bytes[0]
+            # with open(tmp_data1, "wb+") as data1_file:
+            with open(tmp_data2, "wb+") as data2_file:
+                # first four bytes are the file size
+                file_size_bytes = struct.unpack(">Q", file_in.read(8))
+                file_size_bytes = file_size_bytes[0]
 
-                    # determine the size of data 2
-                    data2_size = file_size_bytes // 8
-                    if file_size_bytes % 8 > 0:
-                        data2_size += 1
+                # determine the size of data 2
+                data2_size = file_size_bytes // 8
+                if file_size_bytes % 8 > 0:
+                    data2_size += 1
 
-                    data2_start = file_size - data2_size
+                data2_start = file_size - data2_size
 
-                    for i in range(8, data2_start):
-                        data1_file.write(file_in.read(1))
-                    data1_file.flush()
+                file_in.seek(data2_start)
 
-                    # print(str(data2_start))
+                # read data2
+                shutil.copyfileobj(file_in, data2_file)
+                data2_file.flush()
 
-                    # read data2
-                    shutil.copyfileobj(file_in, data2_file)
-                    data2_file.flush()
+                data2_file.seek(0)
+                # data1_file.seek(0)
+                file_in.seek(8,0)
+                # file_in.read(8)
 
-                    data2_file.seek(0)
-                    data1_file.seek(0)
+                byte_written = 0
 
-                    byte_written = 0
+                max_bit = 8
+                bit_shift = 7
 
-                    max_bit = 8
-                    bit_shift = 7
+                while True:
+                    one_byte = data2_file.read(1)
+                    if one_byte:
+                        one_byte = ord(one_byte)
+                    else:
+                        one_byte = 0
 
-                    while True:
-                        one_byte = data2_file.read(1)
-                        if one_byte:
-                            one_byte = ord(one_byte)
-                        else:
-                            one_byte = 0
+                    if (byte_written + 8 > file_size_bytes):
+                        log('file_size_bytes = '+str(file_size_bytes))
+                        max_bit = (file_size_bytes % 8)
+                        log('209, max_bit: '+str(max_bit))
 
-                        if (byte_written + 8 > file_size_bytes):
-                            log('file_size_bytes = '+str(file_size_bytes))
-                            max_bit = (file_size_bytes % 8)
-                            log('209, max_bit: '+str(max_bit))
+                        # becoz original file size is not a multiple of 8 bits
+                        # need to trim unncessary bits
+                        one_byte = one_byte >> (8-max_bit)
+                        
+                        bit_shift = max_bit - 1
+                        log('218, bit_shift: '+str(bit_shift))
 
-                            # becoz original file size is not a multiple of 8 bits
-                            # need to trim unncessary bits
-                            one_byte = one_byte >> (8-max_bit)
-                            
-                            bit_shift = max_bit - 1
-                            log('218, bit_shift: '+str(bit_shift))
-
-                        for j in reversed(range(max_bit)):
-                            try:
-                                if one_byte >> (j) & 1 == 1:
-                                    tmp = data1_file.read(1)
-                                    if tmp:
-                                        file_out.write(tmp)
-                                        byte_written += 1
-                                    else:
-                                        log(str(one_byte >> (bit_shift - j)))
-                                        log('file_size_bytes = ' + str(file_size_bytes))
-                                        log('tmp = '+str(tmp))
-                                        log('max_bit = '+str(max_bit))
-                                        log('one_byte = '+str(one_byte))
-                                        log('bit_shift = '+str(bit_shift))
-                                        log('j = '+str(j))
-                                        log('byte_written = ' + str(byte_written))
-                                else:
-                                    file_out.write(b"\0")
+                    for j in reversed(range(max_bit)):
+                        try:
+                            if one_byte >> (j) & 1 == 1:
+                                tmp = file_in.read(1)
+                                if tmp:
+                                    file_out.write(tmp)
                                     byte_written += 1
-                            except Exception as identifier:
-                                log('Ex: '+str(bit_shift))
-                                log('Ex: '+str(j))
-                                log('Ex: '+identifier)
-                                raise
-                                # pass
+                                else:
+                                    log(str(one_byte >> (bit_shift - j)))
+                                    log('file_size_bytes = ' + str(file_size_bytes))
+                                    log('tmp = '+str(tmp))
+                                    log('max_bit = '+str(max_bit))
+                                    log('one_byte = '+str(one_byte))
+                                    log('bit_shift = '+str(bit_shift))
+                                    log('j = '+str(j))
+                                    log('byte_written = ' + str(byte_written))
+                            else:
+                                file_out.write(b"\0")
+                                byte_written += 1
+                        except Exception as identifier:
+                            log('Ex: '+str(bit_shift))
+                            log('Ex: '+str(j))
+                            log('Ex: '+identifier)
+                            raise
+                            # pass
 
-                        if byte_written >= file_size_bytes:
-                            break
+                    if byte_written >= file_size_bytes:
+                        break
 
-            file_out.flush()
+        file_out.flush()
